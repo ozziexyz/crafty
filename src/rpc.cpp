@@ -86,7 +86,7 @@ void RPCTransport::do_connect(std::string msg, int port) {
         asio::async_connect(*socket, results,
             [this, msg, socket](asio::error_code ec, const tcp::endpoint& endpoint) {
                 if (ec) {
-                    std::cout << "Connect error: " << ec.message() << std::endl;
+                    // std::cout << "Connect error: " << ec.message() << std::endl;
                     return;
                 }
                 std::make_shared<RPCSession>(std::move(*socket), RPCSessionType::WRITE, write_callback_, msg)->start();
