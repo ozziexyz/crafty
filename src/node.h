@@ -7,8 +7,10 @@
 #include <chrono>
 #include <fstream>
 #include <filesystem>
+#include <algorithm>
 #include "rpc.h"
 #include "kv.h"
+#include "cluster.h"
 
 namespace fs = std::filesystem;
 
@@ -20,7 +22,7 @@ enum Role {
 
 class CraftyNode {
     public:
-        CraftyNode(int port, asio::io_context& io, KVStore store, std::string cfg_filename);
+        CraftyNode(int port, asio::io_context& io, KVStore store, ClusterConfig cfg);
 
     private:
         void reset_heartbeat();
@@ -35,10 +37,10 @@ class CraftyNode {
         void commit();
         void persist();
         void revive();
-        bool configure(std::string cfg_filename);
         std::chrono::milliseconds new_election_timeout();
 
         const int port_;
+        ClusterConfig cfg_;
         int current_term_ = 0;
         int voted_for_ = 0;
         std::vector<LogEntry> log_;
@@ -46,7 +48,6 @@ class CraftyNode {
         int current_leader_ = 0;
         Role role_ = Role::FOLLOWER;
         asio::io_context& io_;
-        std::vector<int> rpc_peers_;
         std::vector<int> votes_received_;
         std::unordered_map<int, std::function<void(KVReply)>> pending_;
         std::unordered_map<int, int> next_index_;

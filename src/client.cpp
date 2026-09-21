@@ -1,7 +1,6 @@
 #include "client.h"
 
-CraftyClient::CraftyClient(asio::io_context& io, std::string cfg_filename) : io_(io) {
-    configure(cfg_filename);
+CraftyClient::CraftyClient(asio::io_context& io, ClusterConfig cfg) : io_(io), cfg_(cfg) {
 }
 
 GetResult CraftyClient::get(std::string key) {
@@ -109,42 +108,27 @@ void CraftyClient::rotate_leader() {
     }
 }
 
-void CraftyClient::configure(std::string filename) {
-    std::ifstream f(filename);
-    std::string line;
-    while (std::getline(f, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        auto eq = line.find('=');
-        if (eq == std::string::npos) continue;
-
-        std::string key = line.substr(0, eq);
-        key.erase(key.find_last_not_of(" \t") + 1);
-        key.erase(0, key.find_first_not_of(" \t"));
-        std::string vals_str = line.substr(eq + 1);
-        std::replace(vals_str.begin(), vals_str.end(), ',', ' ');
-        std::istringstream in(vals_str);
-        std::vector<int> vals;
-        for (int v; in >> v; ) vals.push_back(v + 1110);
-
-        if (key == "rpc_peers") nodes_ = vals;
-    }
-}
-
 int main(int argc, char** argv) {
     asio::io_context io;
-    CraftyClient client(io, "cluster.cfg");
-    if(argc == 3 && std::string(argv[1]) == "get") {
+    CraftyCluster cfg("cluster.cfg");
+    if(cfg.configure()) {
+        CraftyClient client(io, cfg.get_config());
+        if(argc == 3 && std::string(argv[1]) == "get") {
         GetResult result = client.get(argv[2]);
         if(result.success) {
             std::cout << result.value << std::endl;
         }
-    } else if(argc == 4 && std::string(argv[1]) == "put") {
-        bool success = client.put(argv[2], argv[3]);
-        if (success) std::cout << "put successful" << std::endl;
-        if(!success) std::cout << "put unsucessful" << std::endl;
-    } else if(argc == 3 && std::string(argv[1]) == "del") {
-        bool success = client.del(argv[2]);
-        if (success) std::cout << "delete successful" << std::endl;
-        if(!success) std::cout << "delete unsuccessful" << std::endl;
+        } else if(argc == 4 && std::string(argv[1]) == "put") {
+            bool success = client.put(argv[2], argv[3]);
+            if (success) std::cout << "put successful" << std::endl;
+            if(!success) std::cout << "put unsucessful" << std::endl;
+        } else if(argc == 3 && std::string(argv[1]) == "del") {
+            bool success = client.del(argv[2]);
+            if (success) std::cout << "delete successful" << std::endl;
+            if(!success) std::cout << "delete unsuccessful" << std::endl;
+        }
+    } else {
+        std::cout << "Error: configuration failed" << std::endl;
+        return EXIT_FAILURE;
     }
 }

@@ -21,6 +21,7 @@ add_executable(crafty_node
     src/node.cpp 
     src/rpc.cpp
     src/kv.cpp
+    src/cluster.cpp
     ${PROTO_SRCS}
     ${PROTO_HDRS}
 )
@@ -39,6 +40,7 @@ target_link_libraries(crafty_node PRIVATE
 
 add_executable(crafty_client
     src/client.cpp 
+    src/cluster.cpp
     ${PROTO_SRCS}
     ${PROTO_HDRS}
 )

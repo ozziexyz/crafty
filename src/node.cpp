@@ -3,7 +3,7 @@
 #include <cmath>
 #include <random>
 
-CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, std::string cfg_filename) : port_(port), io_(io), store_(store), rpc_service_(io, port,
+CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, ClusterConfig cfg) : port_(port), io_(io), store_(store), cfg_(cfg), rpc_service_(io, port,
     [this](AppendEntriesReply msg) {
         if(msg.current_term == current_term_ && role_ == Role::LEADER) {
             if(msg.valid && msg.ack > match_index_[msg.node_id]) {
@@ -76,13 +76,13 @@ CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, std::strin
             RequestVoteReply reply {port_, current_term_, false};
             return reply;
         }
-    }), kv_service_(io, port + 1110, [this](KVRequest req, std::function<void(KVReply)> respond){
+    }), kv_service_(io, port + cfg_.kv_offset, [this](KVRequest req, std::function<void(KVReply)> respond){
         std::cout << "Received KV Request" << std::endl;
         KVReply reply;
         if (req.type == KVRequestType::GET) { 
             reply = store_.handle_request(req);
             if(current_leader_ != 0) {
-                reply.leader = current_leader_ + 1110;
+                reply.leader = current_leader_ + cfg_.kv_offset;
             } else{
                 reply.leader = 0;
             }
@@ -92,7 +92,7 @@ CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, std::strin
         if(role_ == Role::FOLLOWER) {
             std::cout << "Redirecting" << std::endl;
             if(current_leader_ != 0) {
-                reply.leader = current_leader_ + 1110;
+                reply.leader = current_leader_ + cfg_.kv_offset;
             } else {
                 reply.leader = 0;
             }
@@ -110,18 +110,16 @@ CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, std::strin
             int index = log_.size() - 1;
             pending_[index] = respond;
             commit();
-            for(auto peer : rpc_peers_) {
+            for(auto peer : cfg_.rpc_peers) {
                 if(peer != port_) replicate_log(peer);
             }
             persist();
         }
     }) 
 {
-    if(configure(cfg_filename)) {
-        revive();
-        reset_heartbeat();
-        reset_election_timer();
-    }
+    revive();
+    reset_heartbeat();
+    reset_election_timer();
 }
 
 void CraftyNode::reset_heartbeat() {
@@ -147,7 +145,7 @@ void CraftyNode::reset_election_timer() {
 
 void CraftyNode::do_heartbeat() {
     if(role_ == Role::LEADER) {
-        for(auto peer : rpc_peers_) {
+        for(auto peer : cfg_.rpc_peers) {
             if(peer != port_) replicate_log(peer);
         }
     }
@@ -190,7 +188,7 @@ void CraftyNode::start_election() {
         last_term
     };
     check_election();
-    for(auto peer : rpc_peers_) {
+    for(auto peer : cfg_.rpc_peers) {
         if(peer != port_) rpc_service_.request_vote(msg, peer);
     }
     if(role_ == Role::CANDIDATE) {
@@ -227,7 +225,7 @@ void CraftyNode::process_entries(int prefix_length, int leader_commit, std::vect
 }
 
 void CraftyNode::check_election() {
-    if(votes_received_.size() >= rpc_peers_.size() / 2 + 1) {
+    if(votes_received_.size() >= cfg_.rpc_peers.size() / 2 + 1) {
         current_leader_ = port_;
         election_timer_->cancel();
         become_leader();
@@ -240,14 +238,14 @@ void CraftyNode::become_leader() {
     LogEntry entry {"", current_term_};
     log_.push_back(entry);
     match_index_[port_] = log_.size() - 1;
-    for(auto peer : rpc_peers_) {
+    for(auto peer : cfg_.rpc_peers) {
         if(peer != port_) {
             next_index_[peer] = log_.size() - 1;
             match_index_[peer] = -1;
         }
     }
     persist();
-    for(auto peer : rpc_peers_) {
+    for(auto peer : cfg_.rpc_peers) {
         if(peer != port_) replicate_log(peer);
     }
 }
@@ -265,12 +263,12 @@ void CraftyNode::step_down(int term) {
 }
 
 void CraftyNode::commit() {
-    int quorum = rpc_peers_.size() / 2 + 1;
+    int quorum = cfg_.rpc_peers.size() / 2 + 1;
     int new_commit = commit_index_;
     for(int n = (int)log_.size() - 1; n > commit_index_; n--) {
         if(log_[n].term != current_term_) break;
         int acks = 0;
-        for(auto peer : rpc_peers_) {
+        for(auto peer : cfg_.rpc_peers) {
             if(match_index_[peer] >= n) acks++;
         }
         if(acks >= quorum) {
@@ -281,7 +279,7 @@ void CraftyNode::commit() {
     for(int i = commit_index_ + 1; i <= new_commit; i++) {
         if(log_[i].data.empty()) continue;
         KVReply reply = store_.handle_request(store_.from_buf(log_[i].data));
-        reply.leader = port_ + 1110;
+        reply.leader = port_ + cfg_.kv_offset;
         auto it = pending_.find(i);
         if(it != pending_.end()) {
             it->second(reply);
@@ -336,32 +334,6 @@ void CraftyNode::revive() {
     in.close();
 }
 
-bool CraftyNode::configure(std::string filename) {
-    std::ifstream f(filename);
-    std::string line;
-    while (std::getline(f, line)) {
-        if (line.empty() || line[0] == '#') continue;
-        auto eq = line.find('=');
-        if (eq == std::string::npos) continue;
-
-        std::string key = line.substr(0, eq);
-        key.erase(key.find_last_not_of(" \t") + 1);
-        key.erase(0, key.find_first_not_of(" \t"));
-        std::string vals_str = line.substr(eq + 1);
-        std::replace(vals_str.begin(), vals_str.end(), ',', ' ');
-        std::istringstream in(vals_str);
-        std::vector<int> vals;
-        for (int v; in >> v; ) vals.push_back(v);
-
-        if (key == "rpc_peers") rpc_peers_ = vals;
-    }
-    if(std::find(rpc_peers_.begin(), rpc_peers_.end(), port_) == rpc_peers_.end()) {
-        std::cerr << "Config error: node port must be in rpc_peers" << std::endl;
-        return false;
-    }
-    return true;
-}
-
 std::chrono::milliseconds CraftyNode::new_election_timeout() {
     std::random_device dev;
     std::mt19937 rng(dev());
@@ -384,10 +356,16 @@ int main(int argc, char** argv) {
         cfg_filename = argv[2];
     }
 
-    KVStore store;
-    asio::io_context io;
-    CraftyNode node(port, io, store, cfg_filename);
-    io.run();
+    CraftyCluster cluster(cfg_filename);
+    if(cluster.configure()) {
+        KVStore store;
+        asio::io_context io;
+        CraftyNode node(port, io, store, cluster.get_config());
+        io.run();
+    } else {
+        std::cout << "Error: configuration failed" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     return EXIT_FAILURE;
 }
