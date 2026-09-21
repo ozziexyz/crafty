@@ -109,11 +109,11 @@ CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, ClusterCon
             match_index_[port_] = log_.size() - 1;
             int index = log_.size() - 1;
             pending_[index] = respond;
+            persist();
             commit();
             for(auto peer : cfg_.rpc_peers) {
                 if(peer != port_) replicate_log(peer);
             }
-            persist();
         }
     }) 
 {
@@ -291,6 +291,7 @@ void CraftyNode::commit() {
 
 void CraftyNode::persist() {
     fs::path state_dir = "state";
+    fs::path state_tmp_file = state_dir / ("node" + std::to_string(port_) + ".state.tmp");
     fs::path state_file = state_dir / ("node" + std::to_string(port_) + ".state");
     std::error_code ec;
     fs::create_directories(state_dir, ec);
@@ -310,9 +311,13 @@ void CraftyNode::persist() {
     }
 
     state_str = state.SerializeAsString();
-    std::ofstream out_file(state_file);
+    std::ofstream out_file(state_tmp_file);
     out_file << state_str;
+    out_file.flush();
     out_file.close();
+    if(!out_file.fail()) {
+        fs::rename(state_tmp_file, state_file);
+    }
 }
 
 void CraftyNode::revive() {
