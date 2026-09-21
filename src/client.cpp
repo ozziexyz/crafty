@@ -62,6 +62,10 @@ proto::kv::KVReply CraftyClient::do_send(proto::kv::KVRequest req_buf, int tries
         }
 
         proto::kv::KVReply reply;
+        if(!reply.ParseFromString(buf.data())) {
+            std::cerr << "Error: malformed protobuf" << std::endl;
+            throw 1;
+        };
         reply.ParseFromString(buf.data());
         if(!reply.success() && tries < (int)nodes_.size()) {
             if(reply.leader() != nodes_[leader_index_] && reply.leader() != 0) {
@@ -114,21 +118,30 @@ int main(int argc, char** argv) {
     if(cfg.configure()) {
         CraftyClient client(io, cfg.get_config());
         if(argc == 3 && std::string(argv[1]) == "get") {
-        GetResult result = client.get(argv[2]);
-        if(result.success) {
-            std::cout << result.value << std::endl;
-        }
+            GetResult result = client.get(argv[2]);
+            if(result.success) {
+                std::cout << result.value << std::endl;
+                return EXIT_SUCCESS;
+            }
         } else if(argc == 4 && std::string(argv[1]) == "put") {
             bool success = client.put(argv[2], argv[3]);
-            if (success) std::cout << "put successful" << std::endl;
-            if(!success) std::cout << "put unsucessful" << std::endl;
+            if (success) {
+                std::cout << "put successful" << std::endl;
+                return EXIT_SUCCESS;
+            } else {
+                std::cout << "put unsucessful" << std::endl;
+            }
         } else if(argc == 3 && std::string(argv[1]) == "del") {
             bool success = client.del(argv[2]);
-            if (success) std::cout << "delete successful" << std::endl;
-            if(!success) std::cout << "delete unsuccessful" << std::endl;
+            if (success) {
+                std::cout << "delete successful" << std::endl;
+                return EXIT_SUCCESS;
+            } else {
+                std::cout << "delete unsuccessful" << std::endl;
+            }
         }
     } else {
         std::cout << "Error: configuration failed" << std::endl;
-        return EXIT_FAILURE;
     }
+    return EXIT_FAILURE;
 }

@@ -47,30 +47,39 @@ void KVService::do_accept() {
             } else {
                 std::make_shared<KVSession>(std::move(socket), [this](std::string data, std::function<void(std::string)> respond){
                     proto::kv::KVRequest req_buf;
-                    req_buf.ParseFromString(data);
-                    KVRequest req;
-                    switch(req_buf.type()) {
-                        case proto::kv::KVRequest_RequestType_GET:
-                            req.type = KVRequestType::GET;
-                            break;
-                        case proto::kv::KVRequest_RequestType_PUT:
-                            req.type = KVRequestType::PUT;
-                            break;
-                        case proto::kv::KVRequest_RequestType_DEL:
-                            req.type = KVRequestType::DEL;
-                            break;
-                    }
-                    req.key = req_buf.key();
-                    req.value = req_buf.value();
-                    request_callback_(req, [respond](KVReply reply){
+                    if(!req_buf.ParseFromString(data)) {
+                        std::cout << "Error: malformed request" << std::endl;
                         proto::kv::KVReply reply_buf;
-                        reply_buf.set_success(reply.success);
-                        reply_buf.set_leader(reply.leader);
-                        reply_buf.set_value(reply.value);
+                        reply_buf.set_success(false);
+                        reply_buf.set_leader(0);
                         std::string reply_str;
                         reply_str = reply_buf.SerializeAsString();
                         respond(reply_str);
-                    });
+                    } else {
+                        KVRequest req;
+                        switch(req_buf.type()) {
+                            case proto::kv::KVRequest_RequestType_GET:
+                                req.type = KVRequestType::GET;
+                                break;
+                            case proto::kv::KVRequest_RequestType_PUT:
+                                req.type = KVRequestType::PUT;
+                                break;
+                            case proto::kv::KVRequest_RequestType_DEL:
+                                req.type = KVRequestType::DEL;
+                                break;
+                        }
+                        req.key = req_buf.key();
+                        req.value = req_buf.value();
+                        request_callback_(req, [respond](KVReply reply){
+                            proto::kv::KVReply reply_buf;
+                            reply_buf.set_success(reply.success);
+                            reply_buf.set_leader(reply.leader);
+                            reply_buf.set_value(reply.value);
+                            std::string reply_str;
+                            reply_str = reply_buf.SerializeAsString();
+                            respond(reply_str);
+                        });
+                    }
                 })->start();
             }
             do_accept();

@@ -104,27 +104,30 @@ RPCService::RPCService(
 ) : io_(io), port_(port), ae_reply_callback_(ae_reply_callback), ae_callback_(ae_callback), rv_reply_callback_(rv_reply_callback), rv_callback_(rv_callback), transport_(io, port, 
     [this](std::string data){
         proto::rpc::Envelope envelope;
-        envelope.ParseFromString(data);
-        if(envelope.type() == proto::rpc::Envelope_MessageType_APPEND_ENTRIES_REPLY) {
-            proto::rpc::AppendEntriesReply reply_buf;
-            reply_buf.ParseFromString(envelope.data());
-            AppendEntriesReply reply {
-                reply_buf.node_id(), 
-                reply_buf.current_term(), 
-                reply_buf.ack(), 
-                reply_buf.valid()
-            };
-            ae_reply_callback_(reply);
-        } else if(envelope.type() == proto::rpc::Envelope_MessageType_REQUEST_VOTE_REPLY) {
-            proto::rpc::RequestVoteReply reply_buf;
-            reply_buf.ParseFromString(envelope.data());
-            RequestVoteReply reply {
-                reply_buf.node_id(), 
-                reply_buf.current_term(), 
-                reply_buf.vote() 
-            };
-            rv_reply_callback_(reply);
-        }
+        if(!envelope.ParseFromString(data)){
+            std::cout << "Error: malformed RPC envelope" << std::endl;
+        } else {
+            if(envelope.type() == proto::rpc::Envelope_MessageType_APPEND_ENTRIES_REPLY) {
+                proto::rpc::AppendEntriesReply reply_buf;
+                reply_buf.ParseFromString(envelope.data());
+                AppendEntriesReply reply {
+                    reply_buf.node_id(), 
+                    reply_buf.current_term(), 
+                    reply_buf.ack(), 
+                    reply_buf.valid()
+                };
+                ae_reply_callback_(reply);
+            } else if(envelope.type() == proto::rpc::Envelope_MessageType_REQUEST_VOTE_REPLY) {
+                proto::rpc::RequestVoteReply reply_buf;
+                reply_buf.ParseFromString(envelope.data());
+                RequestVoteReply reply {
+                    reply_buf.node_id(), 
+                    reply_buf.current_term(), 
+                    reply_buf.vote() 
+                };
+                rv_reply_callback_(reply);
+            }
+        };
     },
     [this](std::string data){
         proto::rpc::Envelope envelope_in;
@@ -132,55 +135,59 @@ RPCService::RPCService(
         std::string data_out;
         std::string envelope_string;
         
-        envelope_in.ParseFromString(data);
-        if(envelope_in.type() == proto::rpc::Envelope_MessageType_APPEND_ENTRIES) {
-            proto::rpc::AppendEntries msg_buf;
-            msg_buf.ParseFromString(envelope_in.data());
-            std::vector<proto::rpc::LogEntry> buf_suffix(msg_buf.suffix().begin(), msg_buf.suffix().end());
-            std::vector<LogEntry> suffix;
-            for(auto l : buf_suffix) {
-                suffix.push_back(LogEntry{l.data(), l.term()});
+        if(!envelope_in.ParseFromString(data)) {
+            std::cout << "Error: malformed RPC envelope";
+        } else {
+            if(envelope_in.type() == proto::rpc::Envelope_MessageType_APPEND_ENTRIES) {
+                proto::rpc::AppendEntries msg_buf;
+                msg_buf.ParseFromString(envelope_in.data());
+                std::vector<proto::rpc::LogEntry> buf_suffix(msg_buf.suffix().begin(), msg_buf.suffix().end());
+                std::vector<LogEntry> suffix;
+                for(auto l : buf_suffix) {
+                    suffix.push_back(LogEntry{l.data(), l.term()});
+                }
+                AppendEntries msg {
+                    msg_buf.leader_id(),
+                    msg_buf.current_term(),        
+                    msg_buf.commit_index(),
+                    msg_buf.prefix_length(),
+                    msg_buf.prefix_term(),
+                    suffix
+                };
+                
+                AppendEntriesReply reply = ae_callback_(msg);
+                proto::rpc::AppendEntriesReply reply_buf;
+                reply_buf.set_node_id(reply.node_id);
+                reply_buf.set_current_term(reply.current_term);
+                reply_buf.set_ack(reply.ack);
+                reply_buf.set_valid(reply.valid);
+                data_out = reply_buf.SerializeAsString();
+
+                envelope_out.set_type(proto::rpc::Envelope_MessageType_APPEND_ENTRIES_REPLY);
+                envelope_out.set_data(data_out);
+                return envelope_out.SerializeAsString();
+            } 
+            if(envelope_in.type() == proto::rpc::Envelope_MessageType_REQUEST_VOTE) {
+                proto::rpc::RequestVote msg_buf;
+                msg_buf.ParseFromString(envelope_in.data());
+                RequestVote msg {
+                    msg_buf.node_id(),
+                    msg_buf.current_term(),        
+                    msg_buf.last_index(),
+                    msg_buf.last_term(),
+                };
+                
+                RequestVoteReply reply = rv_callback_(msg);
+                proto::rpc::RequestVoteReply reply_buf;
+                reply_buf.set_node_id(reply.node_id);
+                reply_buf.set_current_term(reply.current_term);
+                reply_buf.set_vote(reply.vote);
+                data_out = reply_buf.SerializeAsString();
+
+                envelope_out.set_type(proto::rpc::Envelope_MessageType_REQUEST_VOTE_REPLY);
+                envelope_out.set_data(data_out);
+                return envelope_out.SerializeAsString();
             }
-            AppendEntries msg {
-                msg_buf.leader_id(),
-                msg_buf.current_term(),        
-                msg_buf.commit_index(),
-                msg_buf.prefix_length(),
-                msg_buf.prefix_term(),
-                suffix
-            };
-            
-            AppendEntriesReply reply = ae_callback_(msg);
-            proto::rpc::AppendEntriesReply reply_buf;
-            reply_buf.set_node_id(reply.node_id);
-            reply_buf.set_current_term(reply.current_term);
-            reply_buf.set_ack(reply.ack);
-            reply_buf.set_valid(reply.valid);
-            data_out = reply_buf.SerializeAsString();
-
-            envelope_out.set_type(proto::rpc::Envelope_MessageType_APPEND_ENTRIES_REPLY);
-            envelope_out.set_data(data_out);
-            return envelope_out.SerializeAsString();
-        } if(envelope_in.type() == proto::rpc::Envelope_MessageType_REQUEST_VOTE) {
-            proto::rpc::RequestVote msg_buf;
-            msg_buf.ParseFromString(envelope_in.data());
-            RequestVote msg {
-                msg_buf.node_id(),
-                msg_buf.current_term(),        
-                msg_buf.last_index(),
-                msg_buf.last_term(),
-            };
-            
-            RequestVoteReply reply = rv_callback_(msg);
-            proto::rpc::RequestVoteReply reply_buf;
-            reply_buf.set_node_id(reply.node_id);
-            reply_buf.set_current_term(reply.current_term);
-            reply_buf.set_vote(reply.vote);
-            data_out = reply_buf.SerializeAsString();
-
-            envelope_out.set_type(proto::rpc::Envelope_MessageType_REQUEST_VOTE_REPLY);
-            envelope_out.set_data(data_out);
-            return envelope_out.SerializeAsString();
         }
         return std::string("invalid message type");
     })
