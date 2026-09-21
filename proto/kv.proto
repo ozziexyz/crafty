@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package crafty.proto.kv;
+
+message KVRequest {
+    enum RequestType {
+        GET = 0;
+        PUT = 1;
+        DEL = 2;
+    }
+
+    RequestType type = 1;
+    bytes key = 2;
+    bytes value = 3;
+}
+
+message KVReply {
+    bytes value = 1;
+    int32 leader = 2;
+    bool success = 3;
+}
