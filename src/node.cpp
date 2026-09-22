@@ -354,7 +354,8 @@ int main(int argc, char** argv) {
         std::cout << "Error: No port specified." << std::endl;
         return EXIT_FAILURE;
     } else if(argc > 1) {
-        port = atoi(argv[1]);
+        char* end;
+        port = std::strtol(argv[1], &end, 10);
     }
 
     if(argc > 2) {
@@ -363,6 +364,11 @@ int main(int argc, char** argv) {
 
     CraftyCluster cluster(cfg_filename);
     if(cluster.configure()) {
+        auto rpc_peers = cluster.get_config().rpc_peers;
+        if(std::find(rpc_peers.begin(), rpc_peers.end(), port) == rpc_peers.end()) {
+            std::cout << "Error: port must be in rpc_ports" << std::endl;
+            return EXIT_FAILURE;
+        }
         KVStore store;
         asio::io_context io;
         CraftyNode node(port, io, store, cluster.get_config());
