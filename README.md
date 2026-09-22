@@ -4,7 +4,11 @@ A key-value store with Raft consensus written in C++17 using Asio, and Protobuf.
 [![CI](https://github.com/ozziexyz/crafty/actions/workflows/ci.yml/badge.svg)](https://github.com/ozziexyz/crafty/actions/workflows/ci.yml)
 
 ## Build
-Make sure you have [CMake](https://cmake.org/) and the [Protobuf](https://github.com/protocolbuffers/protobuf) compiler installed. This project also uses Asio, which gets pulled from [chriskohlhoff/asio](https://github.com/chriskohlhoff/asio.git) automatically during configuration.
+Requires CMake ≥ 3.14 and a C++17 compiler.
+
+Ubuntu/Debian: `sudo apt-get install cmake protobuf-compiler libprotobuf-dev`
+
+macOS (Homebrew): `brew install cmake protobuf`
 ```bash
 git clone https://github.com/ozziexyz/crafty.git
 cd crafty
