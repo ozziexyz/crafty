@@ -12,7 +12,7 @@ void KVSession::start() {
 void KVSession::do_read() {
     auto self(shared_from_this());
     asio::async_read(socket_, asio::buffer(header_),
-        [this, self](std::error_code ec, std::size_t length) {
+        [this, self](std::error_code ec, std::size_t) {
             if (ec) { std::cout << "Read error: " << ec.message() << std::endl; return;};
             uint32_t len = decode_length(header_);
             if (len > MAX_FRAME_SIZE) { std::cout << "Frame too large: " << len << std::endl; return; }
@@ -31,7 +31,7 @@ void KVSession::do_read() {
 void KVSession::do_write() {
     auto self(shared_from_this());
     asio::async_write(socket_, asio::buffer(data_out_),
-        [this, self](std::error_code ec, std::size_t length) {
+        [this, self](std::error_code ec, std::size_t) {
             if (ec) { std::cout << "Write error: " << ec.message() << std::endl; return;};
         });
 }

@@ -3,7 +3,7 @@
 #include <cmath>
 #include <random>
 
-CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, ClusterConfig cfg) : port_(port), io_(io), store_(store), cfg_(cfg), rpc_service_(io, port,
+CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, ClusterConfig cfg) : port_(port), io_(io), cfg_(cfg), store_(store), rpc_service_(io, port,
     [this](AppendEntriesReply msg) {
         if(msg.current_term == current_term_ && role_ == Role::LEADER) {
             if(msg.valid && msg.ack > match_index_[msg.node_id]) {
@@ -33,7 +33,7 @@ CraftyNode::CraftyNode(int port, asio::io_context& io, KVStore store, ClusterCon
                 role_ = Role::FOLLOWER;
             }
         }
-        bool log_ok = (log_.size() >= msg.prefix_length) && (msg.prefix_length == 0 || log_[msg.prefix_length - 1].term == msg.prefix_term);
+        bool log_ok = ((int)log_.size() >= msg.prefix_length) && (msg.prefix_length == 0 || log_[msg.prefix_length - 1].term == msg.prefix_term);
         if(msg.current_term == current_term_ && log_ok) {
             process_entries(msg.prefix_length, msg.commit_index, msg.suffix);
             int ack = msg.prefix_length + (int)msg.suffix.size() - 1;
@@ -199,7 +199,7 @@ void CraftyNode::start_election() {
 
 void CraftyNode::process_entries(int prefix_length, int leader_commit, std::vector<LogEntry> suffix) {
     int index;
-    if(suffix.size() > 0 && log_.size() > prefix_length) {
+    if(suffix.size() > 0 && (int)log_.size() > prefix_length) {
         index = std::min(log_.size(), prefix_length + suffix.size()) - 1;
         if(log_[index].term != suffix[index - prefix_length].term) {
             std::vector<LogEntry> new_log_(log_.begin(), log_.begin() + prefix_length);
@@ -208,7 +208,7 @@ void CraftyNode::process_entries(int prefix_length, int leader_commit, std::vect
         persist();
     }
     if(prefix_length + suffix.size() > log_.size()) {
-        for(int i = log_.size() - prefix_length; i <= suffix.size() - 1; i++) {
+        for(int i = log_.size() - prefix_length; i <= (int)suffix.size() - 1; i++) {
             log_.push_back(suffix[i]);
         }
         persist();

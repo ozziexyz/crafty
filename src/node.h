@@ -40,6 +40,7 @@ class CraftyNode {
         std::chrono::milliseconds new_election_timeout();
 
         const int port_;
+        asio::io_context& io_;
         ClusterConfig cfg_;
         int current_term_ = 0;
         int voted_for_ = 0;
@@ -47,7 +48,6 @@ class CraftyNode {
         int commit_index_ = -1;
         int current_leader_ = 0;
         Role role_ = Role::FOLLOWER;
-        asio::io_context& io_;
         std::vector<int> votes_received_;
         std::unordered_map<int, std::function<void(KVReply)>> pending_;
         std::unordered_map<int, int> next_index_;
@@ -55,8 +55,8 @@ class CraftyNode {
         std::shared_ptr<asio::steady_timer> election_timer_;
         std::shared_ptr<asio::steady_timer> heartbeat_timer_;
         KVStore store_;
-        KVService kv_service_;
         RPCService rpc_service_;
+        KVService kv_service_;
 };
 
 #endif

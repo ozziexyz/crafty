@@ -5,14 +5,14 @@ RPCSession::RPCSession(
     tcp::socket socket, 
     RPCSessionType type, 
     std::function<std::string(std::string)> read_callback
-) : socket_(std::move(socket)), type_(type), read_callback_(read_callback) {}
+) : type_(type), socket_(std::move(socket)), read_callback_(read_callback) {}
 
 RPCSession::RPCSession(
     tcp::socket socket, 
     RPCSessionType type, 
     std::function<void(std::string)> write_callback,
     std::string data
-) : socket_(std::move(socket)), type_(type), data_out_(encode_frame(data)), write_callback_(write_callback) {}
+) : type_(type), socket_(std::move(socket)), data_out_(encode_frame(data)), write_callback_(write_callback) {}
 
 void RPCSession::start() {
     if(type_ == RPCSessionType::READ) {
@@ -25,7 +25,7 @@ void RPCSession::start() {
 void RPCSession::do_read() {
     auto self(shared_from_this());
     asio::async_read(socket_, asio::buffer(header_),
-        [this, self](std::error_code ec, std::size_t length) {
+        [this, self](std::error_code ec, std::size_t) {
             if (ec) { std::cout << "Read error: " << ec.message() << std::endl; return;};
             uint32_t len = decode_length(header_);
             if (len > MAX_FRAME_SIZE) { std::cout << "Frame too large: " << len << std::endl; return; }
@@ -55,7 +55,7 @@ void RPCSession::do_write() {
     }
 
     asio::async_write(socket_, asio::buffer(data_out_),
-        [this, self](std::error_code ec, std::size_t length) {
+        [this, self](std::error_code ec, std::size_t) {
             if (ec) { std::cout << "Write error: " << ec.message() << std::endl; return;};
             
             if(type_ == RPCSessionType::WRITE) {
@@ -69,7 +69,7 @@ RPCTransport::RPCTransport(
     int port, 
     std::function<void(std::string)> write_callback, 
     std::function<std::string(std::string)> read_callback
-) : io_(io), port_(port), acceptor_(io, tcp::endpoint(tcp::v4(), port)), write_callback_(write_callback), read_callback_(read_callback) {
+) : io_(io), port_(port), write_callback_(write_callback), read_callback_(read_callback), acceptor_(io, tcp::endpoint(tcp::v4(), port)) {
     do_accept();
 }
 
@@ -92,7 +92,7 @@ void RPCTransport::do_connect(std::string msg, int port) {
 
         auto socket = std::make_shared<tcp::socket>(io_);
         asio::async_connect(*socket, results,
-            [this, msg, socket](asio::error_code ec, const tcp::endpoint& endpoint) {
+            [this, msg, socket](asio::error_code ec, const tcp::endpoint) {
                 if (ec) {
                     // std::cout << "Connect error: " << ec.message() << std::endl;
                     return;

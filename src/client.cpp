@@ -102,7 +102,7 @@ proto::kv::KVReply CraftyClient::do_send(proto::kv::KVRequest req_buf, int tries
 }
 
 void CraftyClient::rotate_leader() {
-    if(leader_index_ != nodes_.size() - 1) {
+    if(leader_index_ != (int)nodes_.size() - 1) {
         leader_index_++;
     } else {
         leader_index_ = 0;
