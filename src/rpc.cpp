@@ -46,7 +46,12 @@ void RPCSession::do_write() {
     auto self(shared_from_this());
 
     if(type_ == RPCSessionType::READ) {
-        data_out_ = encode_frame(read_callback_(data_in_));
+        std::string rc = read_callback_(data_in_);
+        if(rc != "\n") { // TODO: fix this ASAP
+            data_out_ = encode_frame(read_callback_(data_in_));
+        } else {
+            socket_.close();
+        }
     }
 
     asio::async_write(socket_, asio::buffer(data_out_),
@@ -192,7 +197,7 @@ RPCService::RPCService(
                 return envelope_out.SerializeAsString();
             }
         }
-        return std::string("invalid message type");
+        return std::string("\n");
     })
 {}
 
