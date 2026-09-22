@@ -4,3 +4,5 @@ state
 TODO.md
 *.state
 .cache/
+compile_commands.json
+logs
