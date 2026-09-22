@@ -1,4 +1,5 @@
 #include "kv.h"
+#include <iostream>
 
 KVSession::KVSession(
     tcp::socket socket, 

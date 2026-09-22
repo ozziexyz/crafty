@@ -45,7 +45,6 @@ class KVSession : public std::enable_shared_from_this<KVSession> {
 class KVService {
     public:
         KVService(asio::io_context& io, int port, std::function<void(KVRequest, std::function<void(KVReply)>)> request_callback);
-        void send_request(KVRequest req, int port);
     private:
         void do_accept();
         asio::io_context& io_;

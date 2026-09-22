@@ -48,7 +48,7 @@ void RPCSession::do_write() {
     if(type_ == RPCSessionType::READ) {
         std::string rc = read_callback_(data_in_);
         if(rc != "\n") { // TODO: fix this ASAP
-            data_out_ = encode_frame(read_callback_(data_in_));
+            data_out_ = encode_frame(rc);
         } else {
             socket_.close();
         }
@@ -109,7 +109,7 @@ RPCService::RPCService(
     std::function<AppendEntriesReply(AppendEntries)> ae_callback,
     std::function<void(RequestVoteReply)> rv_reply_callback, 
     std::function<RequestVoteReply(RequestVote)> rv_callback
-) : io_(io), port_(port), ae_reply_callback_(ae_reply_callback), ae_callback_(ae_callback), rv_reply_callback_(rv_reply_callback), rv_callback_(rv_callback), transport_(io, port, 
+) : ae_reply_callback_(ae_reply_callback), ae_callback_(ae_callback), rv_reply_callback_(rv_reply_callback), rv_callback_(rv_callback), transport_(io, port,
     [this](std::string data){
         proto::rpc::Envelope envelope;
         if(!envelope.ParseFromString(data)){
@@ -174,8 +174,7 @@ RPCService::RPCService(
                 envelope_out.set_type(proto::rpc::Envelope_MessageType_APPEND_ENTRIES_REPLY);
                 envelope_out.set_data(data_out);
                 return envelope_out.SerializeAsString();
-            } 
-            if(envelope_in.type() == proto::rpc::Envelope_MessageType_REQUEST_VOTE) {
+            } else if(envelope_in.type() == proto::rpc::Envelope_MessageType_REQUEST_VOTE) {
                 proto::rpc::RequestVote msg_buf;
                 msg_buf.ParseFromString(envelope_in.data());
                 RequestVote msg {

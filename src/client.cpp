@@ -1,4 +1,7 @@
 #include "client.h"
+#include <algorithm>
+#include <iostream>
+#include <iterator>
 
 CraftyClient::CraftyClient(asio::io_context& io, ClusterConfig cfg) : io_(io), cfg_(cfg) {
 }

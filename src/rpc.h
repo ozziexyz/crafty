@@ -103,8 +103,6 @@ class RPCService {
         void request_vote(RequestVote msg, int peer);
 
     private:
-        asio::io_context& io_;
-        int port_;
         std::function<void(AppendEntriesReply)> ae_reply_callback_;
         std::function<AppendEntriesReply(AppendEntries)> ae_callback_;
         std::function<void(RequestVoteReply)> rv_reply_callback_;

@@ -1,5 +1,6 @@
 #include <iostream>
 #include "node.h"
+#include <algorithm>
 #include <cmath>
 #include <random>
 
@@ -347,7 +348,7 @@ std::chrono::milliseconds CraftyNode::new_election_timeout() {
 }
 
 int main(int argc, char** argv) {
-    int port;
+    int port = 0;
     std::string cfg_filename = "cluster.cfg";
 
     if(argc == 1){

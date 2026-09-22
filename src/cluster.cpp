@@ -8,6 +8,7 @@
 #include <chrono>
 #include <algorithm>
 #include <filesystem>
+#include <sstream>
 
 CraftyCluster::CraftyCluster(std::string cfg_filename) : cfg_filename_(cfg_filename) {}
 
