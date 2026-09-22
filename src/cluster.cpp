@@ -13,6 +13,10 @@ CraftyCluster::CraftyCluster(std::string cfg_filename) : cfg_filename_(cfg_filen
 
 bool CraftyCluster::configure() {
     std::ifstream f(cfg_filename_);
+    if(f.fail()) {
+        std::cout << "Could not find " + cfg_filename_ << std::endl;
+        return false;
+    }
     std::string line;
     while (std::getline(f, line)) {
         if (line.empty() || line[0] == '#') continue;
