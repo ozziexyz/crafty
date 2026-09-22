@@ -2,3 +2,5 @@
 build
 state
 TODO.md
+*.state
+.cache/
