@@ -1,5 +1,14 @@
-cmake_minimum_required(VERSION 3.10.0)
+cmake_minimum_required(VERSION 3.14)
 project(crafty VERSION 0.1.0 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
+add_compile_options(-Wall -Wextra)
 
 find_package(Threads REQUIRED)
 find_package(Protobuf REQUIRED)
@@ -33,9 +42,9 @@ target_include_directories(crafty_node PRIVATE
 )
 
 target_compile_definitions(crafty_node PRIVATE ASIO_STANDALONE)
-target_link_libraries(crafty_node PRIVATE 
+target_link_libraries(crafty_node PRIVATE
     Threads::Threads
-    ${Protobuf_LIBRARIES}
+    protobuf::libprotobuf
 )
 
 add_executable(crafty_client
@@ -52,7 +61,7 @@ target_include_directories(crafty_client PRIVATE
 )
 
 target_compile_definitions(crafty_client PRIVATE ASIO_STANDALONE)
-target_link_libraries(crafty_client PRIVATE 
+target_link_libraries(crafty_client PRIVATE
     Threads::Threads
-    ${Protobuf_LIBRARIES}
+    protobuf::libprotobuf
 )
