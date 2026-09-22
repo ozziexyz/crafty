@@ -5,6 +5,7 @@
 #include <string>
 #include <asio.hpp>
 #include "kv.pb.h"
+#include "framing.h"
 
 using namespace crafty;
 using asio::ip::tcp;
@@ -37,6 +38,7 @@ class KVSession : public std::enable_shared_from_this<KVSession> {
         tcp::socket socket_;
         std::string data_in_;
         std::string data_out_;
+        std::array<unsigned char, 4> header_;
         std::function<void(std::string, std::function<void(std::string)>)> read_callback_;
 };
 

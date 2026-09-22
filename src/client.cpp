@@ -49,24 +49,21 @@ proto::kv::KVReply CraftyClient::do_send(proto::kv::KVRequest req_buf, int tries
         asio::ip::tcp::socket socket(io_);
         asio::connect(socket, endpoints);
 
-        asio::write(socket, asio::buffer(req_data));
+        asio::write(socket, asio::buffer(encode_frame(req_data)));
 
-        asio::error_code error;
-        std::array<char, 4096> buf;
-        while (true) {
-            size_t len = socket.read_some(asio::buffer(buf), error);
-            if (error == asio::error::eof)
-                break;
-            else if (error)
-                throw asio::system_error(error);
-        }
+        std::array<unsigned char, 4> hdr;
+        asio::read(socket, asio::buffer(hdr));
+        uint32_t len = decode_length(hdr);
+        if (len > MAX_FRAME_SIZE) throw std::runtime_error("frame too large");
+        std::string reply_data(len, '\0');
+        asio::read(socket, asio::buffer(reply_data));
 
         proto::kv::KVReply reply;
-        if(!reply.ParseFromString(buf.data())) {
+        if(!reply.ParseFromString(reply_data)) {
             std::cerr << "Error: malformed protobuf" << std::endl;
             throw 1;
         };
-        reply.ParseFromString(buf.data());
+        reply.ParseFromString(reply_data);
         if(!reply.success() && tries < (int)nodes_.size()) {
             if(reply.leader() != nodes_[leader_index_] && reply.leader() != 0) {
                 auto leader_it = std::find(nodes_.begin(), nodes_.end(), reply.leader());

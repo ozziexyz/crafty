@@ -4,6 +4,7 @@
 #include <memory>
 #include <asio.hpp>
 #include "rpc.pb.h"
+#include "framing.h"
 
 using asio::ip::tcp;
 using namespace crafty;
@@ -64,6 +65,7 @@ class RPCSession : public std::enable_shared_from_this<RPCSession> {
         tcp::socket socket_;
         std::string data_in_;
         std::string data_out_;
+        std::array<unsigned char, 4> header_;
         std::function<void(std::string)> write_callback_;
         std::function<std::string(std::string)> read_callback_;
 };

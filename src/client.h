@@ -6,6 +6,7 @@
 #include <fstream>
 #include "kv.pb.h"
 #include "cluster.h"
+#include "framing.h"
 
 using namespace crafty;
 

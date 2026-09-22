@@ -12,7 +12,7 @@ RPCSession::RPCSession(
     RPCSessionType type, 
     std::function<void(std::string)> write_callback,
     std::string data
-) : socket_(std::move(socket)), type_(type), data_out_(data), write_callback_(write_callback) {}
+) : socket_(std::move(socket)), type_(type), data_out_(encode_frame(data)), write_callback_(write_callback) {}
 
 void RPCSession::start() {
     if(type_ == RPCSessionType::READ) {
@@ -24,18 +24,21 @@ void RPCSession::start() {
 
 void RPCSession::do_read() {
     auto self(shared_from_this());
-
-    data_in_.resize(1024);
-
-    socket_.async_read_some(asio::buffer(data_in_),
+    asio::async_read(socket_, asio::buffer(header_),
         [this, self](std::error_code ec, std::size_t length) {
             if (ec) { std::cout << "Read error: " << ec.message() << std::endl; return;};
-            data_in_.resize(length);
-            if(type_ == RPCSessionType::READ) {
-                do_write();
-            } else if(type_ == RPCSessionType::WRITE) {
-                write_callback_(data_in_);
-            }
+            uint32_t len = decode_length(header_);
+            if (len > MAX_FRAME_SIZE) { std::cout << "Frame too large: " << len << std::endl; return; }
+            data_in_.resize(len);
+            asio::async_read(socket_, asio::buffer(data_in_),
+            [this, self](std::error_code ec, std::size_t) {
+                if (ec) { std::cout << "Read error: " << ec.message() << std::endl; return;};
+                if(type_ == RPCSessionType::READ) {
+                    do_write();
+                } else if(type_ == RPCSessionType::WRITE) {
+                    write_callback_(data_in_);
+                }                
+            });
         });
 }
 
@@ -43,7 +46,7 @@ void RPCSession::do_write() {
     auto self(shared_from_this());
 
     if(type_ == RPCSessionType::READ) {
-        data_out_ = read_callback_(data_in_);
+        data_out_ = encode_frame(read_callback_(data_in_));
     }
 
     asio::async_write(socket_, asio::buffer(data_out_),
